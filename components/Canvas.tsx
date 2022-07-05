@@ -1,10 +1,10 @@
 /** @jsx h */
 /** @jsxFrag Fragment */
 import { h, createContext, Fragment } from "preact";
-import { useLayoutEffect, useRef, useState, useContext } from "preact/hooks";
+import { useEffect, useState, useContext, useMemo } from "preact/hooks";
 
 const CanvasContext = createContext<HTMLCanvasElement | null>(null);
-const Context2DContext = createContext<CanvasRenderingContext2D | null>(null);
+const Context2dContext = createContext<CanvasRenderingContext2D | null>(null);
 
 export function useCanvas() {
   const canvas = useContext(CanvasContext);
@@ -16,7 +16,7 @@ export function useCanvas() {
 }
 
 export function useContext2d() {
-  const context2d = useContext(Context2DContext);
+  const context2d = useContext(Context2dContext);
   if (!context2d) {
     throw new Error("useContext must be used within a Canvas component");
   }
@@ -24,35 +24,39 @@ export function useContext2d() {
   return context2d;
 }
 
-export function Canvas({ children }: { children: preact.ComponentChildren }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
+export type CanvasProps = { children?: preact.JSX.Element | null };
+
+export function Canvas({ children }: CanvasProps) {
+  const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(
+    null
+  );
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
-  useLayoutEffect(() => {
+
+  useEffect(() => {
     const handleResize = () => {
       setWidth(innerWidth);
       setHeight(innerHeight);
     };
-    contextRef.current = canvasRef.current?.getContext("2d") ?? null;
-    setIsMounted(true);
     addEventListener("resize", handleResize);
     handleResize();
     return () => {
-      setIsMounted(false);
       removeEventListener("resize", handleResize);
     };
-  }, []);
+  }, [canvasElement]);
+  const context2d = useMemo(
+    () => canvasElement?.getContext("2d") ?? null,
+    [canvasElement]
+  );
 
   return (
-    <CanvasContext.Provider value={canvasRef.current}>
-      <Context2DContext.Provider value={contextRef.current}>
-        <canvas ref={canvasRef} width={width} height={height} />
-        <Fragment key={Number(new Date())}>
-          {isMounted ? children : null}
+    <CanvasContext.Provider value={canvasElement}>
+      <Context2dContext.Provider value={context2d}>
+        <canvas ref={setCanvasElement} width={width} height={height} />
+        <Fragment key={`${width}x${height}`}>
+          {canvasElement ? children : null}
         </Fragment>
-      </Context2DContext.Provider>
+      </Context2dContext.Provider>
     </CanvasContext.Provider>
   );
 }
