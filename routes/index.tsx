@@ -1,6 +1,6 @@
 /** @jsx h */
 import { h } from "preact";
-import Counter from "../islands/Counter.tsx";
+import Game from "../islands/Game.tsx";
 
 export default function Home() {
   return (
@@ -14,7 +14,7 @@ export default function Home() {
         Welcome to `fresh`. Try update this message in the ./routes/index.tsx
         file, and refresh.
       </p>
-      <Counter start={3} />
+      <Game />
     </div>
   );
 }

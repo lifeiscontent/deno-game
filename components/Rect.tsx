@@ -1,4 +1,4 @@
-import { useContext2d } from "@/components/Canvas.tsx";
+import { useContext2d } from "./Canvas.tsx";
 import { useEffect } from "preact/hooks";
 
 export function Rect({
