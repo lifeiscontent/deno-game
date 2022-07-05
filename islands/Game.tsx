@@ -4,12 +4,14 @@ import { useState } from "preact/hooks";
 import { IS_BROWSER } from "$fresh/runtime.ts";
 import { Canvas, Rect } from "~/components/index.ts";
 
-interface GameProps {}
+type GameProps = unknown;
 
 export default function Game(props: GameProps) {
   return (
     <Canvas>
-      <Rect fillColor="red" x={0} y={0} />
+      <Rect fillColor="red">
+        <Rect fillColor="blue" x={200} y={200} />
+      </Rect>
     </Canvas>
   );
 }
