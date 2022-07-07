@@ -1,10 +1,18 @@
 /** @jsx h */
 /** @jsxFrag Fragment */
-import { h, createContext, Fragment } from "preact";
-import { useEffect, useState, useContext, useMemo } from "preact/hooks";
+import { createContext, Fragment, h } from "preact";
+import type { ComponentChildren } from "preact";
+import {
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "preact/hooks";
 
 const CanvasContext = createContext<HTMLCanvasElement | null>(null);
-const Context2dContext = createContext<CanvasRenderingContext2D | null>(null);
+export const Context2dContext = createContext<CanvasRenderingContext2D | null>(
+  null,
+);
 
 export function useCanvas() {
   const canvas = useContext(CanvasContext);
@@ -24,11 +32,11 @@ export function useContext2d() {
   return context2d;
 }
 
-export type CanvasProps = { children?: preact.JSX.Element | null };
+export type CanvasProps = { children?: ComponentChildren };
 
-export function Canvas({ children }: CanvasProps) {
+export function Canvas({ children = null }: CanvasProps) {
   const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(
-    null
+    null,
   );
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
@@ -44,9 +52,10 @@ export function Canvas({ children }: CanvasProps) {
       removeEventListener("resize", handleResize);
     };
   }, [canvasElement]);
+
   const context2d = useMemo(
     () => canvasElement?.getContext("2d") ?? null,
-    [canvasElement]
+    [canvasElement],
   );
 
   return (
