@@ -1,7 +1,11 @@
+export type Id = unknown;
+
 export type Player = {
   color: string;
   name: string;
-  id: unknown;
+  id: Id;
   x: number;
   y: number;
 };
+
+export type Input = "up" | "down" | "left" | "right";

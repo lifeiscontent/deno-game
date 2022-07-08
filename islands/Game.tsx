@@ -1,112 +1,150 @@
 /** @jsx h */
 import "preact/debug";
 import { h } from "preact";
-import { useCallback, useEffect, useReducer, useState } from "preact/hooks";
+import {
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from "preact/hooks";
 import { Canvas, Context2dContext, Rect } from "~/components/index.ts";
-import type { ApiMessage, ChannelMessage } from "~/messages/index.ts";
+import type { ClientMessage, ServerMessage } from "~/messages/index.ts";
 import type { Player } from "~/entities/index.ts";
+import * as fx from "@fxts/core";
 
 type GameProps = unknown;
 
-const PLAYER_SPEED = 0.5;
-
 type GameState = {
-  players: Player[];
+  playerId: Player["id"];
+  playerIds: Set<Player["id"]>;
+  players: Map<Player["id"], Player>;
 };
 
-const gameReducer = (state: GameState, message: ChannelMessage) => {
+const gameReducer = (state: GameState, message: ServerMessage) => {
+  console.log(message);
   switch (message.type) {
+    case "loadGameState":
+      return {
+        playerId: message.state.playerId,
+        playerIds: new Set(message.state.playerIds),
+        players: new Map(message.state.players),
+      };
     case "addPlayer":
-      return { ...state, players: [...state.players, message.player] };
+      return {
+        ...state,
+        playerIds: new Set([...state.playerIds, message.player.id]),
+        players: new Map([...state.players, [
+          message.player.id,
+          message.player,
+        ]]),
+      };
+    case "movePlayer": {
+      const player = state.players.get(message.id);
+      if (!player) return state;
+      return {
+        ...state,
+        players: new Map(
+          fx.map(
+            (playerTuple) =>
+              playerTuple[0] === message.id
+                ? [message.id, {
+                  ...playerTuple[1],
+                  x: message.x,
+                  y: message.y,
+                }]
+                : playerTuple,
+            state.players,
+          ),
+        ),
+      };
+    }
+    case "removePlayer":
+      return {
+        ...state,
+        playerIds: new Set(
+          fx.filter((id) => id !== message.id, state.playerIds),
+        ),
+        players: new Map(
+          fx.filter(([id]) => id !== message.id, state.players),
+        ),
+      };
     default:
       return state;
   }
 };
 
 export default function Game(props: GameProps) {
-  const [state, dispatch] = useReducer(gameReducer, { players: [] });
+  const [{ playerId, playerIds, players }, dispatch] = useReducer(gameReducer, {
+    playerId: undefined,
+    players: new Map(),
+    playerIds: new Set(),
+  });
+
+  const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const events = new EventSource(`/api/connect`);
-    const listener = (e: MessageEvent) => {
-      const msg: ChannelMessage = JSON.parse(e.data);
-      dispatch(msg);
+    const url = new URL("/api/ws", window.location.origin);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(url);
+    socketRef.current = socket;
+
+    const handleOpen = (event: Event) => {
+      console.info(event);
     };
-    events.addEventListener("message", listener);
+    const handleMessage = (event: MessageEvent) => {
+      dispatch(JSON.parse(event.data));
+    };
+    const handleError = (event: Event) => {
+      console.error(event);
+    };
+
+    socket.addEventListener("open", handleOpen);
+    socket.addEventListener("message", handleMessage);
+    socket.addEventListener("error", handleError);
     return () => {
-      events.removeEventListener("message", listener);
+      socket.removeEventListener("open", handleOpen);
+      socket.removeEventListener("message", handleMessage);
+      socket.removeEventListener("error", handleError);
+      socketRef.current = null;
+      socket.close();
     };
   }, []);
 
-  const sendMessage = useCallback((message: ApiMessage) => {
-    fetch("/api/send", {
-      method: "POST",
-      body: JSON.stringify(message),
-    });
-  }, []);
-
   useEffect(() => {
-    sendMessage({
-      type: "addPlayer",
-      player: {
-        name: `Player ${Math.ceil(Math.random() * 100)}`,
-        color: `#${
-          Math.ceil(Math.random() * 0xffffff).toString(16).padEnd(6, "0")
-        }`,
-      },
-    });
-  }, []);
-
-  useEffect(() => {
-    let requestAnimationFrameId: number;
-    let startTime = performance.now();
-    const keys = { UP: false, DOWN: false, LEFT: false, RIGHT: false };
     const handleKeydown = (event: KeyboardEvent) => {
       event.preventDefault();
-      if (event.repeat) return;
-      const pressed = event.type === "keydown";
+      // if (event.repeat) return;
       switch (event.key) {
         case "ArrowLeft":
-          keys.LEFT = pressed;
+          socketRef.current?.send(
+            JSON.stringify({ type: "playerInput", input: "left" }),
+          );
           break;
         case "ArrowRight":
-          keys.RIGHT = pressed;
+          socketRef.current?.send(
+            JSON.stringify({ type: "playerInput", input: "right" }),
+          );
           break;
         case "ArrowUp":
-          keys.UP = pressed;
+          socketRef.current?.send(
+            JSON.stringify({ type: "playerInput", input: "up" }),
+          );
           break;
         case "ArrowDown":
-          keys.DOWN = pressed;
+          socketRef.current?.send(
+            JSON.stringify({ type: "playerInput", input: "down" }),
+          );
           break;
       }
-    };
-    const loop = () => {
-      const delta = performance.now() - startTime;
-      // if (keys.LEFT) {
-      //   setPlayerX((x) => x - delta * PLAYER_SPEED);
-      // }
-      // if (keys.RIGHT) {
-      //   setPlayerX((x) => x + delta * PLAYER_SPEED);
-      // }
-      // if (keys.UP) {
-      //   setPlayerY((y) => y - delta * PLAYER_SPEED);
-      // }
-      // if (keys.DOWN) {
-      //   setPlayerY((y) => y + delta * PLAYER_SPEED);
-      // }
-
-      requestAnimationFrameId = requestAnimationFrame(loop);
-      startTime = performance.now();
     };
 
     addEventListener("keydown", handleKeydown);
     addEventListener("keyup", handleKeydown);
-    requestAnimationFrameId = requestAnimationFrame(loop);
 
     return () => {
       removeEventListener("keydown", handleKeydown);
       removeEventListener("keyup", handleKeydown);
-      cancelAnimationFrame(requestAnimationFrameId);
     };
   }, []);
 
@@ -124,16 +162,19 @@ export default function Game(props: GameProps) {
               width={ctx?.canvas.width ?? 0}
               height={ctx?.canvas.height ?? 0}
             >
-              {state.players.map((player) => (
-                <Rect
-                  key={player.id}
-                  width={50}
-                  height={50}
-                  fillStyle={player.color}
-                  x={player.x}
-                  y={player.y}
-                />
-              ))}
+              {Array.from(playerIds).map((id) => {
+                const player = players.get(id)!;
+                return (
+                  <Rect
+                    key={id}
+                    width={50}
+                    height={50}
+                    fillStyle={player.color}
+                    x={player.x}
+                    y={player.y}
+                  />
+                );
+              })}
             </Rect>
           );
         }}

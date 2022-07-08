@@ -1,4 +1,4 @@
-import type { ComponentChildren} from 'preact';
+import type { ComponentChildren } from "preact";
 import { useContext2d } from "./Canvas.tsx";
 
 export type ArcProps = {

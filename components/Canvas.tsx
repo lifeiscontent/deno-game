@@ -2,12 +2,7 @@
 /** @jsxFrag Fragment */
 import { createContext, Fragment, h } from "preact";
 import type { ComponentChildren } from "preact";
-import {
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "preact/hooks";
+import { useContext, useEffect, useMemo, useState } from "preact/hooks";
 
 const CanvasContext = createContext<HTMLCanvasElement | null>(null);
 export const Context2dContext = createContext<CanvasRenderingContext2D | null>(
