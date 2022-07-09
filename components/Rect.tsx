@@ -1,8 +1,7 @@
-import type { ComponentChildren } from "preact";
 import { useContext2d } from "./Canvas.tsx";
 
 export type RectProps = {
-  children?: ComponentChildren;
+  children?: preact.ComponentChildren;
   fillRule?: CanvasFillRule;
   fillStyle: string | CanvasGradient | CanvasPattern;
   height: number;
@@ -38,5 +37,5 @@ export function Rect({
 
   ctx.closePath();
 
-  return children;
+  return children as preact.JSX.Element;
 }

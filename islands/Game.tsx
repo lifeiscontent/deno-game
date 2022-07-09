@@ -1,17 +1,12 @@
 /** @jsx h */
 import "preact/debug";
 import { h } from "preact";
-import {
-  useCallback,
-  useEffect,
-  useReducer,
-  useRef,
-  useState,
-} from "preact/hooks";
+import { useEffect, useReducer, useRef } from "preact/hooks";
 import { Canvas, Context2dContext, Rect } from "~/components/index.ts";
-import type { ClientMessage, ServerMessage } from "~/messages/index.ts";
+import type { ServerMessage } from "~/messages/index.ts";
 import type { Player } from "~/entities/index.ts";
 import * as fx from "@fxts/core";
+import { deserialize, serialize } from "bson";
 
 type GameProps = unknown;
 
@@ -93,11 +88,13 @@ export default function Game(props: GameProps) {
       console.info(event);
     };
     const handleMessage = (event: MessageEvent) => {
-      dispatch(JSON.parse(event.data));
+      dispatch(deserialize(event.data) as ServerMessage);
     };
     const handleError = (event: Event) => {
       console.error(event);
     };
+
+    socket.binaryType = "arraybuffer";
 
     socket.addEventListener("open", handleOpen);
     socket.addEventListener("message", handleMessage);
@@ -118,22 +115,22 @@ export default function Game(props: GameProps) {
       switch (event.key) {
         case "ArrowLeft":
           socketRef.current?.send(
-            JSON.stringify({ type: "playerInput", input: "left" }),
+            serialize({ type: "playerInput", input: "left" }),
           );
           break;
         case "ArrowRight":
           socketRef.current?.send(
-            JSON.stringify({ type: "playerInput", input: "right" }),
+            serialize({ type: "playerInput", input: "right" }),
           );
           break;
         case "ArrowUp":
           socketRef.current?.send(
-            JSON.stringify({ type: "playerInput", input: "up" }),
+            serialize({ type: "playerInput", input: "up" }),
           );
           break;
         case "ArrowDown":
           socketRef.current?.send(
-            JSON.stringify({ type: "playerInput", input: "down" }),
+            serialize({ type: "playerInput", input: "down" }),
           );
           break;
       }

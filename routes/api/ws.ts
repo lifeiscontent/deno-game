@@ -1,5 +1,6 @@
 import type { Player } from "~/entities/index.ts";
 import type { ClientMessage, ServerMessage } from "~/messages/index.ts";
+import { deserialize, serialize } from "bson";
 
 const players = new Map<Player["id"], Player>();
 
@@ -8,7 +9,7 @@ let clientId = 0;
 
 function dispatch(msg: ServerMessage): void {
   for (const client of clients.values()) {
-    client.send(JSON.stringify(msg));
+    client.send(serialize(msg));
   }
 }
 
@@ -26,7 +27,7 @@ function wsHandler(ws: WebSocket) {
     };
     players.set(id, player);
     ws.send(
-      JSON.stringify({
+      serialize({
         type: "loadGameState",
         timestamp: Date.now(),
         state: {
@@ -45,7 +46,7 @@ function wsHandler(ws: WebSocket) {
   };
 
   ws.onmessage = (e) => {
-    const message: ClientMessage = JSON.parse(e.data);
+    const message = deserialize(e.data) as ClientMessage;
     switch (message.type) {
       case "playerInput": {
         const player = players.get(id)!;
@@ -82,6 +83,7 @@ function wsHandler(ws: WebSocket) {
     players.delete(id);
     dispatch({ type: "removePlayer", id, timestamp: Date.now() });
   };
+  ws.binaryType = "arraybuffer";
 }
 
 export const handler = (req: Request): Response => {

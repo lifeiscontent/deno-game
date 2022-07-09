@@ -1,8 +1,7 @@
-import type { ComponentChildren } from "preact";
 import { useContext2d } from "./Canvas.tsx";
 
 export type ArcProps = {
-  children?: ComponentChildren;
+  children?: preact.ComponentChildren;
   counterclockwise?: boolean;
   endAngle: number;
   fillRule?: CanvasFillRule;
@@ -44,5 +43,5 @@ export function Arc({
 
   ctx.closePath();
 
-  return children;
+  return children as preact.JSX.Element;
 }
