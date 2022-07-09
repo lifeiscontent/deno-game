@@ -1,6 +1,6 @@
 import type { Player } from "~/entities/index.ts";
-import type { ClientMessage, ServerMessage } from "~/messages/index.ts";
-import { deserialize, serialize } from "bson";
+import { ClientMessage, ServerMessage } from "~/messaging/types.ts";
+import { deserializeMessage, serializeMessage } from "~/messaging/server.ts";
 
 const players = new Map<Player["id"], Player>();
 
@@ -9,79 +9,66 @@ let clientId = 0;
 
 function dispatch(msg: ServerMessage): void {
   for (const client of clients.values()) {
-    client.send(serialize(msg));
+    client.send(serializeMessage(msg));
+  }
+}
+
+function dispatchOthers(msg: ServerMessage, current: WebSocket): void {
+  for (const client of clients.values()) {
+    if (current !== client) {
+      client.send(serializeMessage(msg));
+    }
   }
 }
 
 function wsHandler(ws: WebSocket) {
-  const id = ++clientId;
+  const playerId = ++clientId;
   ws.onopen = () => {
-    const player = {
-      id,
-      color: `#${
-        Math.floor(Math.random() * 0xffffff).toString(16).padEnd(6, "0")
-      }`,
-      name: `Player ${id}`,
-      x: Math.ceil(Math.random() * 255),
-      y: Math.ceil(Math.random() * 255),
-    };
-    players.set(id, player);
     ws.send(
-      serialize({
-        type: "loadGameState",
-        timestamp: Date.now(),
-        state: {
-          id,
-          players: Array.from(players),
-          playerIds: Array.from(players.keys()),
-        },
+      serializeMessage({
+        type: "handshake",
+        generation: Infinity,
+        id: playerId,
       }),
     );
-    dispatch({
-      type: "addPlayer",
-      timestamp: Date.now(),
-      player,
-    });
-    clients.set(id, ws);
+    for (const player of players.values()) {
+      if (player.id === playerId) continue;
+      ws.send(serializeMessage({
+        type: "addPlayer",
+        generation: Infinity,
+        player: player,
+      }));
+    }
+    clients.set(playerId, ws);
   };
 
   ws.onmessage = (e) => {
-    const message = deserialize(e.data) as ClientMessage;
+    const message = deserializeMessage(e.data);
     switch (message.type) {
-      case "playerInput": {
-        const player = players.get(id)!;
-        switch (message.input) {
-          case "up":
-            player.y -= 10;
-            break;
-          case "down":
-            player.y += 10;
-            break;
-          case "left":
-            player.x -= 10;
-            break;
-          case "right":
-            player.x += 10;
-            break;
-        }
+      case "addPlayer":
+        players.set(message.player.id, message.player);
+        dispatchOthers(message, ws);
+        break;
+      case "updatePlayer":
+        players.set(message.player.id, message.player);
         dispatch({
-          type: "movePlayer",
-          id,
-          x: player.x,
-          y: player.y,
-          timestamp: Date.now(),
+          type: "updatePlayer",
+          player: message.player,
+          generation: message.generation,
         });
         break;
-      }
       default:
-        console.info(`Unknown message: ${e.data}`);
+        console.info(`Unknown message: ${JSON.stringify(message)}`);
     }
   };
 
   ws.onclose = () => {
-    clients.delete(id);
-    players.delete(id);
-    dispatch({ type: "removePlayer", id, timestamp: Date.now() });
+    dispatchOthers(
+      { type: "removePlayer", id: playerId, generation: Infinity },
+      ws,
+    );
+    clients.delete(playerId);
+    players.delete(playerId);
   };
   ws.binaryType = "arraybuffer";
 }

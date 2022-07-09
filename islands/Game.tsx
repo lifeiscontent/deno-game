@@ -1,82 +1,93 @@
 /** @jsx h */
+/** @jsxFrag Fragment */
 import "preact/debug";
-import { h } from "preact";
-import { useEffect, useReducer, useRef } from "preact/hooks";
+import { Fragment, h } from "preact";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { Canvas, Context2dContext, Rect } from "~/components/index.ts";
-import type { ServerMessage } from "~/messages/index.ts";
+import { ServerMessage } from "~/messaging/types.ts";
+import { deserializeMessage, serializeMessage } from "~/messaging/client.ts";
 import type { Player } from "~/entities/index.ts";
-import * as fx from "@fxts/core";
-import { deserialize, serialize } from "bson";
 
 type GameProps = unknown;
 
-type GameState = {
-  playerId: Player["id"];
-  playerIds: Set<Player["id"]>;
-  players: Map<Player["id"], Player>;
-};
-
-const gameReducer = (state: GameState, message: ServerMessage) => {
-  console.log(message);
-  switch (message.type) {
-    case "loadGameState":
-      return {
-        playerId: message.state.playerId,
-        playerIds: new Set(message.state.playerIds),
-        players: new Map(message.state.players),
-      };
-    case "addPlayer":
-      return {
-        ...state,
-        playerIds: new Set([...state.playerIds, message.player.id]),
-        players: new Map([...state.players, [
-          message.player.id,
-          message.player,
-        ]]),
-      };
-    case "movePlayer": {
-      const player = state.players.get(message.id);
-      if (!player) return state;
-      return {
-        ...state,
-        players: new Map(
-          fx.map(
-            (playerTuple) =>
-              playerTuple[0] === message.id
-                ? [message.id, {
-                  ...playerTuple[1],
-                  x: message.x,
-                  y: message.y,
-                }]
-                : playerTuple,
-            state.players,
-          ),
-        ),
-      };
-    }
-    case "removePlayer":
-      return {
-        ...state,
-        playerIds: new Set(
-          fx.filter((id) => id !== message.id, state.playerIds),
-        ),
-        players: new Map(
-          fx.filter(([id]) => id !== message.id, state.players),
-        ),
-      };
-    default:
-      return state;
-  }
-};
+const PLAYER_SPEED = 0.2;
 
 export default function Game(props: GameProps) {
-  const [{ playerId, playerIds, players }, dispatch] = useReducer(gameReducer, {
-    playerId: undefined,
-    players: new Map(),
-    playerIds: new Set(),
-  });
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [id, setId] = useState<Player["id"]>();
+  const [x, setX] = useState(0);
+  const [y, setY] = useState(0);
+  const [generation, setGeneration] = useState(0);
+  const generationRef = useRef(generation);
+  const playerIdRef = useRef<Player["id"]>();
+  generationRef.current = generation;
 
   const socketRef = useRef<WebSocket | null>(null);
+
+  const dispatch = (message: ServerMessage) => {
+    if (!playerIdRef.current && message.type === "handshake") {
+      setId(message.id);
+      return;
+    }
+    switch (message.type) {
+      case "addPlayer":
+        setPlayers((players) => [...players, message.player]);
+        break;
+      case "updatePlayer": {
+        if (message.player.id === playerIdRef.current) {
+          if (message.generation >= generationRef.current - 1) {
+            setX(message.player.x);
+            setY(message.player.y);
+          }
+        } else {
+          setPlayers((players) =>
+            players.map((player) =>
+              player.id === message.player.id
+                ? { ...player, x: message.player.x, y: message.player.y }
+                : player
+            )
+          );
+        }
+        break;
+      }
+      case "removePlayer":
+        setPlayers((players) =>
+          players.filter((player) => player.id !== message.id)
+        );
+        break;
+    }
+  };
+
+  useEffect(() => {
+    if (id === undefined) return;
+    if (playerIdRef.current) {
+      socketRef.current?.send(
+        serializeMessage({
+          type: "updatePlayer",
+          generation: generationRef.current,
+          player: {
+            id,
+            x,
+            y,
+          },
+        }),
+      );
+    } else {
+      socketRef.current?.send(
+        serializeMessage({
+          type: "addPlayer",
+          generation: generationRef.current,
+          player: {
+            id,
+            x,
+            y,
+          },
+        }),
+      );
+      playerIdRef.current = id;
+    }
+    setGeneration((g) => g + 1);
+  }, [x, y, id]);
 
   useEffect(() => {
     const url = new URL("/api/ws", window.location.origin);
@@ -88,7 +99,7 @@ export default function Game(props: GameProps) {
       console.info(event);
     };
     const handleMessage = (event: MessageEvent) => {
-      dispatch(deserialize(event.data) as ServerMessage);
+      dispatch(deserializeMessage(event.data));
     };
     const handleError = (event: Event) => {
       console.error(event);
@@ -104,44 +115,56 @@ export default function Game(props: GameProps) {
       socket.removeEventListener("message", handleMessage);
       socket.removeEventListener("error", handleError);
       socketRef.current = null;
+      playerIdRef.current = undefined;
       socket.close();
     };
   }, []);
 
   useEffect(() => {
-    const handleKeydown = (event: KeyboardEvent) => {
+    let requestAnimationFrameHandle: number;
+    const keys = { UP: false, DOWN: false, LEFT: false, RIGHT: false };
+    const handleKey = (event: KeyboardEvent) => {
       event.preventDefault();
-      // if (event.repeat) return;
+      const pressed = event.type === "keydown";
+      if (event.repeat) return;
       switch (event.key) {
         case "ArrowLeft":
-          socketRef.current?.send(
-            serialize({ type: "playerInput", input: "left" }),
-          );
+          keys.LEFT = pressed;
           break;
         case "ArrowRight":
-          socketRef.current?.send(
-            serialize({ type: "playerInput", input: "right" }),
-          );
+          keys.RIGHT = pressed;
           break;
         case "ArrowUp":
-          socketRef.current?.send(
-            serialize({ type: "playerInput", input: "up" }),
-          );
+          keys.UP = pressed;
           break;
         case "ArrowDown":
-          socketRef.current?.send(
-            serialize({ type: "playerInput", input: "down" }),
-          );
+          keys.DOWN = pressed;
           break;
       }
     };
 
-    addEventListener("keydown", handleKeydown);
-    addEventListener("keyup", handleKeydown);
+    let lastFrame = performance.now();
+
+    const loop = () => {
+      const now = performance.now();
+      const delta = now - lastFrame;
+      if (keys.UP) setY((y) => y - delta * PLAYER_SPEED);
+      if (keys.DOWN) setY((y) => y + delta * PLAYER_SPEED);
+      if (keys.LEFT) setX((x) => x - delta * PLAYER_SPEED);
+      if (keys.RIGHT) setX((x) => x + delta * PLAYER_SPEED);
+      lastFrame = now;
+      requestAnimationFrameHandle = requestAnimationFrame(loop);
+    };
+
+    addEventListener("keydown", handleKey);
+    addEventListener("keyup", handleKey);
+
+    requestAnimationFrameHandle = requestAnimationFrame(loop);
 
     return () => {
-      removeEventListener("keydown", handleKeydown);
-      removeEventListener("keyup", handleKeydown);
+      cancelAnimationFrame(requestAnimationFrameHandle);
+      removeEventListener("keydown", handleKey);
+      removeEventListener("keyup", handleKey);
     };
   }, []);
 
@@ -159,19 +182,26 @@ export default function Game(props: GameProps) {
               width={ctx?.canvas.width ?? 0}
               height={ctx?.canvas.height ?? 0}
             >
-              {Array.from(playerIds).map((id) => {
-                const player = players.get(id)!;
-                return (
-                  <Rect
-                    key={id}
-                    width={50}
-                    height={50}
-                    fillStyle={player.color}
-                    x={player.x}
-                    y={player.y}
-                  />
-                );
-              })}
+              {players.map((player) => (
+                <Rect
+                  key={player.id}
+                  width={50}
+                  height={50}
+                  fillStyle="green"
+                  x={player.x}
+                  y={player.y}
+                />
+              ))}
+              {id !== undefined && (
+                <Rect
+                  key={id}
+                  width={50}
+                  height={50}
+                  fillStyle="blue"
+                  x={x}
+                  y={y}
+                />
+              )}
             </Rect>
           );
         }}
