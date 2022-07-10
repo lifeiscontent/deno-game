@@ -1,30 +1,36 @@
 import { useContext2d } from "./Canvas.tsx";
 
-export type RectProps = {
+export type ArcProps = {
   children?: preact.ComponentChildren;
+  counterclockwise?: boolean;
+  endAngle: number;
   fillRule?: CanvasFillRule;
   fillStyle: string | CanvasGradient | CanvasPattern;
-  height: number;
+  height?: number;
+  radius: number;
+  startAngle: number;
   strokeStyle?: string | CanvasGradient | CanvasPattern;
-  width: number;
-  x: number;
-  y: number;
+  width?: number;
+  x?: number;
+  y?: number;
 };
 
-export function Rect({
+export function Arc({
   children,
-  fillRule,
   fillStyle,
-  height,
+  fillRule,
   strokeStyle,
-  width,
-  x,
-  y,
-}: RectProps) {
+  radius,
+  startAngle,
+  endAngle,
+  counterclockwise,
+  x = 0,
+  y = 0,
+}: ArcProps) {
   const ctx = useContext2d();
 
   ctx.beginPath();
-  ctx.rect(x, y, width, height);
+  ctx.arc(x, y, radius, startAngle, endAngle, counterclockwise);
   if (fillStyle) {
     ctx.fillStyle = fillStyle;
     ctx.fill(fillRule);
