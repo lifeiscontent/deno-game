@@ -1,13 +1,13 @@
 /** @jsx h */
 /** @jsxFrag Fragment */
 import { h, Fragment } from "preact";
-import Game from "../islands/Game.tsx";
+import JoinGame from "../islands/JoinGame.tsx";
 
 export default function Home() {
   return (
     <>
-      <style>{`body { margin: 0;}`}</style>
-      <Game />
+          <style>{`body { margin: 0;}`}</style>
+          <JoinGame />
     </>
   );
 }
