@@ -1,28 +1,29 @@
 export class EventEmitter<
-  TEventMap extends { [eventName: string]: (...args: any[]) => void },
-  TEvent extends keyof TEventMap = keyof TEventMap
+  TEventMap extends { [type: string]: (...args: any[]) => void }
 > {
-  private listeners: Map<TEvent, TEventMap[TEvent][]> = new Map();
+  private listeners: Map<keyof TEventMap, TEventMap[keyof TEventMap][]> =
+    new Map();
 
-  on<TTEvent extends TEvent>(event: TTEvent, listener: TEventMap[TTEvent]) {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, []);
+  on<TType extends keyof TEventMap>(type: TType, listener: TEventMap[TType]) {
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, []);
     }
-    this.listeners.get(event)!.push(listener);
+
+    this.listeners.get(type)!.push(listener);
   }
 
-  emit<TTEvent extends TEvent>(
-    event: TTEvent,
-    ...args: Parameters<TEventMap[TTEvent]>
+  emit<TType extends keyof TEventMap>(
+    type: TType,
+    ...args: Parameters<TEventMap[TType]>
   ) {
-    if (this.listeners.has(event)) {
-      this.listeners.get(event)!.forEach((listener) => listener(...args));
+    if (this.listeners.has(type)) {
+      this.listeners.get(type)!.forEach((listener) => listener(...args));
     }
   }
 
-  off<TTEvent extends TEvent>(event: TTEvent, listener: TEventMap[TTEvent]) {
-    if (this.listeners.has(event)) {
-      const listeners = this.listeners.get(event)!;
+  off<TType extends keyof TEventMap>(type: TType, listener: TEventMap[TType]) {
+    if (this.listeners.has(type)) {
+      const listeners = this.listeners.get(type)!;
       const index = listeners.indexOf(listener);
       if (index > -1) {
         listeners.splice(index, 1);
@@ -30,5 +31,3 @@ export class EventEmitter<
     }
   }
 }
-
-// usage
