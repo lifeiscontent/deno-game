@@ -1,5 +1,7 @@
-import { GameLoop } from "./GameLoop.ts";
-import { GameState, GameStateManager } from "./GameState.ts";
+import { GameLoop } from "~/core/GameLoop.ts";
+import { GameStateManager } from "~/core/GameState.ts";
+import { LobbyState } from "./states/index.ts";
+
 
 export function main(
   room: string,
@@ -24,24 +26,4 @@ export function main(
 
   console.log(gameloop);
   gameloop.start();
-}
-
-class LobbyState extends GameState {
-  tick() {}
-  step() {}
-  render() {
-    this.context.clearRect(
-      0,
-      0,
-      this.context.canvas.width,
-      this.context.canvas.height
-    );
-    this.context.fillText("Welcome to the lobby", 100, 100);
-  }
-  enter() {
-    console.log("Joined the lobby");
-  }
-  leave() {
-    console.log("Left the lobby the lobby");
-  }
 }
