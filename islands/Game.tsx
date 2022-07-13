@@ -2,7 +2,7 @@
 import { h } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import { deserialize } from "bson";
-import { main } from "~/core/main.ts";
+import { main } from "~/game/main.ts";
 
 export default function Game({ room }: { room: string }) {
   const socketRef = useRef<WebSocket | null>(null);

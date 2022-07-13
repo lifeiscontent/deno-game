@@ -1,7 +1,10 @@
 import { GameState, } from "~/core/GameState.ts"
+import { EntityManager } from "~/core/EntityManager.ts";
+import { Entity } from "../entities/Index.ts";
 
 
 export class LobbyState extends GameState {
+  
   tick() {}
   step() {}
   render() {
@@ -11,9 +14,11 @@ export class LobbyState extends GameState {
       this.context.canvas.width,
       this.context.canvas.height
     );
+
     this.context.fillText("Welcome to the lobby", 100, 100);
   }
   enter() {
+
     console.log("Joined the lobby");
   }
   leave() {

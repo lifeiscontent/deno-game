@@ -1,3 +1,4 @@
+import { EntityManager } from "./EntityManager.ts";
 import type { GameLoop, GameTime } from "./GameLoop.ts";
 
 export class GameStateManager {
@@ -48,7 +49,7 @@ export class GameStateManager {
 }
 
 export abstract class GameState {
-  constructor(public name: string, public context: CanvasRenderingContext2D) {}
+  constructor(public name: string, public context: CanvasRenderingContext2D, protected entityManager: EntityManager) {}
   abstract enter(): void;
   abstract leave(): void;
   abstract step(time: GameTime): void;

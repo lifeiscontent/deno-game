@@ -6,16 +6,16 @@ function isIntersecting(boxA: IRect, boxB: IRect) {
   const leftBoundaryA = boxA.x;
   const topBoundaryA = boxA.y + boxA.height;
   const bottomBoundaryA = boxA.y;
-
+  
   // horizontally intersecting
-  const intersectingX = boxB.x <= leftBoundaryA && boxB.x >= rightBoundaryA;
-  const intersectingY = boxB.y <= topBoundaryA && boxB.y >= bottomBoundaryA;
-
-  return intersectingX && intersectingY;
+  const intersectingX = boxB.x <= leftBoundaryA || boxB.x >= rightBoundaryA;
+  const intersectingY = boxB.y <= topBoundaryA || boxB.y >= bottomBoundaryA;
+  
+  return intersectingX || intersectingY;
 }
 
 
-export default class Camera implements IDrawable {
+export class Camera implements IDrawable {
   x: number = 0;
   y: number = 0;
 
@@ -27,8 +27,8 @@ export default class Camera implements IDrawable {
   private translate(thing: IRect): IVector2D {
     const { x, y, width, height } = this;
     return {
-      x: x - thing.x,
-      y: y - thing.y,
+      x: thing.x - x,
+      y: thing.y - y,
     };
   }
 
